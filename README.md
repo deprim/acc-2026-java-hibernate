@@ -1,21 +1,62 @@
-# Practical Task: Library Book Tracker API
+### 1. Registering a user
 
-Starter project for Data Architecture practical task: Build a REST API for managing books in a library using Spring Boot, Spring Data JPA and an H2 database.
+I added a public registration endpoint:
 
-## Task
-Complete all of the 'TODO' portions of the code. The finished application should compile and all of the controller endpoints should be functional.
+Registration allows the application to generate BCrypt hashes itself. There is no need to use an external password-hashing website or manually insert password hashes into the database.
 
-## Behavioural Requirements
-- Books can be created
-- All books can be retrieved
-- A single book can be retrieved by ID
-- Books can be deleted
-- Books can be filtered and searched by their fields.
-- Controller delegates to Service, which delegates to Repository
-- DTOs are used for requests and responses
+![Registration request](screenshots/registration.png)
 
-## Stretch goals
-- Request validation
-- Custom exception handling
-- Searching by partial title
-- Add 'borrow' and 'return' endpoints along with the new 'borrowedStatus' field to the Book entity
+### 2. Checking the stored password
+
+During registration, the service encodes the submitted password using `BCryptPasswordEncoder` and saves the user through `AppUserRepository`.
+
+The original password was not stored in the table.
+
+![Registered user with a BCrypt password hash](screenshots/registered-user.png)
+
+### 3. Preparing USER and ADMIN accounts
+
+I registered another account with the username `admin`. Registration assigns the role `USER`, so I changed this account's role manually in H2 Console for testing:
+
+```sql
+UPDATE users
+SET role = 'ADMIN'
+WHERE username = 'admin';
+```
+
+The database then contained two accounts: `user` with the role `USER` and `admin` with the role `ADMIN`.
+
+`CustomUserDetailService` loads their usernames, password hashes and roles from the database for authentication.
+
+![USER and ADMIN accounts in the database](screenshots/user-and-admin.png)
+
+### 4. Attempting to create a book without authentication
+
+Without providing credentials. The application returned `401 Unauthorized`, preventing unauthenticated access to the operation.
+
+![Unauthenticated book creation request returns 401](screenshots/unauthenticated-request.png)
+
+### 5. Creating a book as ADMIN
+
+I repeated the request using HTTP Basic authentication with the registered administrator account.
+
+The application returned `200 OK` and the created book, including its generated ID. This confirmed that the administrator could create a book.
+
+![ADMIN creates a book successfully](screenshots/admin-creates-book.png)
+
+### 6. Reading a book as USER
+
+I authenticated as the regular user and requested the book created in the previous step:
+
+The application returned `200 OK` with the book data. This confirmed that a user without the `ADMIN` role could read data.
+
+![USER reads a book successfully](screenshots/user-reads-book.png)
+
+### 7. Attempting to create a book as USER
+
+I sent another request using the regular user's Basic Auth credentials.
+
+The application returned `403 Forbidden`. The user was authenticated but did not have the `ADMIN` role required to create a book.
+
+![USER cannot create a book](screenshots/user-write-forbidden.png)
+
